@@ -588,12 +588,14 @@ fd_runtime_freeze( fd_exec_slot_ctx_t * slot_ctx ) {
       rec->meta->info.lamports += fees;
       rec->meta->slot = slot_ctx->slot_bank.slot;
 
-      fd_blockstore_start_write( slot_ctx->blockstore );
-      fd_block_t * blk = slot_ctx->block;
-      blk->rewards.collected_fees = fees;
-      blk->rewards.post_balance = rec->meta->info.lamports;
-      memcpy( blk->rewards.leader.uc, leader->uc, sizeof(fd_hash_t) );
-      fd_blockstore_end_write( slot_ctx->blockstore );
+      if( FD_LIKELY( slot_ctx->blockstore ) ) {
+        fd_blockstore_start_write( slot_ctx->blockstore );
+        fd_block_t * blk = slot_ctx->block;
+        blk->rewards.collected_fees = fees;
+        blk->rewards.post_balance = rec->meta->info.lamports;
+        memcpy( blk->rewards.leader.uc, leader->uc, sizeof(fd_hash_t) );
+        fd_blockstore_end_write( slot_ctx->blockstore );
+      }
     } while(0);
 
     ulong old = slot_ctx->slot_bank.capitalization;
@@ -1067,16 +1069,22 @@ int
 fd_runtime_block_execute_prepare( fd_exec_slot_ctx_t * slot_ctx ) {
   /* Update block height */
   slot_ctx->slot_bank.block_height += 1UL;
-  fd_blockstore_start_write( slot_ctx->blockstore );
-  fd_blockstore_block_height_update( slot_ctx->blockstore,
-                                     slot_ctx->slot_bank.slot,
-                                     slot_ctx->slot_bank.block_height );
+
+  if( FD_LIKELY( slot_ctx->blockstore ) ) {
+    fd_blockstore_start_write( slot_ctx->blockstore );
+    fd_blockstore_block_height_update( slot_ctx->blockstore,
+                                      slot_ctx->slot_bank.slot,
+                                      slot_ctx->slot_bank.block_height );
+
+    if( FD_LIKELY( slot_ctx->slot_bank.slot!=0UL ) ) {
+      slot_ctx->block = fd_blockstore_block_query( slot_ctx->blockstore, slot_ctx->slot_bank.slot );
+    }
+
+    fd_blockstore_end_write( slot_ctx->blockstore );
+  }
 
   // TODO: this is not part of block execution, move it.
   if( slot_ctx->slot_bank.slot != 0UL ) {
-    slot_ctx->block = fd_blockstore_block_query( slot_ctx->blockstore, slot_ctx->slot_bank.slot );
-    fd_blockstore_end_write( slot_ctx->blockstore );
-
     ulong             slot_idx;
     fd_epoch_bank_t * epoch_bank = fd_exec_epoch_ctx_epoch_bank( slot_ctx->epoch_ctx );
     ulong             prev_epoch = fd_slot_to_epoch( &epoch_bank->epoch_schedule, slot_ctx->slot_bank.prev_slot, &slot_idx );
@@ -1093,8 +1101,6 @@ fd_runtime_block_execute_prepare( fd_exec_slot_ctx_t * slot_ctx ) {
       fd_process_new_epoch( slot_ctx, new_epoch - 1UL );
       fd_funk_end_write( slot_ctx->acc_mgr->funk );
     }
-  } else {
-    fd_blockstore_end_write( slot_ctx->blockstore );
   }
 
   slot_ctx->slot_bank.collected_execution_fees = 0UL;
@@ -3272,9 +3278,8 @@ fd_runtime_block_verify_ticks( fd_block_info_t const * block_info,
 /* Genesis                                                                    */
 /*******************************************************************************/
 
-static void 
-fd_runtime_init_program( fd_exec_slot_ctx_t * slot_ctx )
-{
+void 
+fd_runtime_init_program( fd_exec_slot_ctx_t * slot_ctx ) {
   fd_sysvar_recent_hashes_init( slot_ctx );
   fd_sysvar_clock_init( slot_ctx );
   fd_sysvar_slot_history_init( slot_ctx );
@@ -3911,7 +3916,7 @@ fd_runtime_publish_old_txns( fd_exec_slot_ctx_t * slot_ctx,
   return 0;
 }
 
-static int
+int
 fd_runtime_block_execute_tpool( fd_exec_slot_ctx_t *    slot_ctx,
                                 fd_capture_ctx_t *      capture_ctx,
                                 fd_block_info_t const * block_info,
