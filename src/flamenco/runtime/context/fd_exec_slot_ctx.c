@@ -504,9 +504,10 @@ fd_exec_slot_ctx_recover_status_cache( fd_exec_slot_ctx_t *    ctx,
         fd_status_pair_t * pair = &slot_delta->slot_delta_vec[j];
         fd_hash_t * blockhash = &pair->hash;
 
+        uchar * results = fd_scratch_alloc( alignof(uchar), pair->value.statuses_len );
         for( ulong k = 0; k < pair->value.statuses_len; k++ ) {
           fd_cache_status_t * status = &pair->value.statuses[k];
-          uchar * result = fd_scratch_alloc( alignof(uchar), sizeof(uchar) );
+          uchar * result = results + k;
           *result = (uchar)status->result.discriminant;
           insert_vals[idx++] = (fd_txncache_insert_t){
             .blockhash = blockhash->uc,
