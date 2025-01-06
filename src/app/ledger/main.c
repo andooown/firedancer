@@ -1180,7 +1180,7 @@ replay( fd_ledger_args_t * args ) {
                                                  fd_txncache_footprint( FD_TXNCACHE_DEFAULT_MAX_ROOTED_SLOTS,
                                                                         FD_TXNCACHE_DEFAULT_MAX_LIVE_SLOTS,
                                                                         MAX_CACHE_TXNS_PER_SLOT,
-                                                                        FD_TXNCACHE_DEFAULT_MAX_ROOTED_SLOTS),
+                                                                        FD_TXNCACHE_DEFAULT_MAX_CONSTIPATED_SLOTS),
                                                                         FD_TXNCACHE_MAGIC );
   args->slot_ctx->status_cache = fd_txncache_join( fd_txncache_new( status_cache_mem,
                                                                     FD_TXNCACHE_DEFAULT_MAX_ROOTED_SLOTS,
