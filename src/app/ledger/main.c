@@ -1679,6 +1679,7 @@ initial_setup( int argc, char ** argv, fd_ledger_args_t * args ) {
 }
 
 int main( int argc, char ** argv ) {
+  /* Declaring this on the stack gets the alignment wrong when using asan */
   fd_ledger_args_t * args = aligned_alloc( alignof(fd_ledger_args_t), sizeof(fd_ledger_args_t) );
   memset( args, 0, sizeof(fd_ledger_args_t) );
   initial_setup( argc, argv, args );
