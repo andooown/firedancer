@@ -1679,21 +1679,24 @@ initial_setup( int argc, char ** argv, fd_ledger_args_t * args ) {
 }
 
 int main( int argc, char ** argv ) {
-  fd_ledger_args_t args = {0};
-  initial_setup( argc, argv, &args );
+  fd_ledger_args_t * args = aligned_alloc( alignof(fd_ledger_args_t), sizeof(fd_ledger_args_t) );
+  memset( args, 0, sizeof(fd_ledger_args_t) );
+  initial_setup( argc, argv, args );
 
-  if( args.cmd == NULL ) {
+  if( args->cmd == NULL ) {
     FD_LOG_ERR(( "no command specified" ));
-  } else if( strcmp( args.cmd, "replay" ) == 0 ) {
-    return replay( &args );
-  } else if( strcmp( args.cmd, "ingest" ) == 0 ) {
-    ingest( &args );
-  } else if( strcmp( args.cmd, "minify" ) == 0 ) {
-    minify( &args );
-  } else if( strcmp( args.cmd, "prune" ) == 0 ) {
-    prune( &args );
+  } else if( strcmp( args->cmd, "replay" ) == 0 ) {
+    return replay( args );
+  } else if( strcmp( args->cmd, "ingest" ) == 0 ) {
+    ingest( args );
+  } else if( strcmp( args->cmd, "minify" ) == 0 ) {
+    minify( args );
+  } else if( strcmp( args->cmd, "prune" ) == 0 ) {
+    prune( args );
   } else {
-    FD_LOG_ERR(( "unknown command=%s", args.cmd ));
+    FD_LOG_ERR(( "unknown command=%s", args->cmd ));
   }
+
+  free( args );
   return 0;
 }

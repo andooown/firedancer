@@ -287,10 +287,10 @@ fd_exec_slot_ctx_recover_( fd_exec_slot_ctx_t *   slot_ctx,
   /* The hard forks should be deep copied over.
      TODO:This should be in the epoch bank and not the slot bank. */
   slot_bank->hard_forks.hard_forks_len = oldbank->hard_forks.hard_forks_len;
-  slot_bank->hard_forks.hard_forks     = fd_valloc_malloc( slot_ctx->valloc, 
-                                                            FD_SLOT_PAIR_ALIGN, 
+  slot_bank->hard_forks.hard_forks     = fd_valloc_malloc( slot_ctx->valloc,
+                                                            FD_SLOT_PAIR_ALIGN,
                                                             oldbank->hard_forks.hard_forks_len * FD_SLOT_PAIR_FOOTPRINT );
-  memcpy( slot_bank->hard_forks.hard_forks, oldbank->hard_forks.hard_forks, 
+  memcpy( slot_bank->hard_forks.hard_forks, oldbank->hard_forks.hard_forks,
           oldbank->hard_forks.hard_forks_len * FD_SLOT_PAIR_FOOTPRINT );
 
   /* Update last restart slot
@@ -506,12 +506,13 @@ fd_exec_slot_ctx_recover_status_cache( fd_exec_slot_ctx_t *    ctx,
 
         for( ulong k = 0; k < pair->value.statuses_len; k++ ) {
           fd_cache_status_t * status = &pair->value.statuses[k];
-          uchar result = (uchar)status->result.discriminant;
+          uchar * result = fd_scratch_alloc( alignof(uchar), sizeof(uchar) );
+          *result = (uchar)status->result.discriminant;
           insert_vals[idx++] = (fd_txncache_insert_t){
             .blockhash = blockhash->uc,
             .slot = slot,
             .txnhash = status->key_slice,
-            .result = &result
+            .result = result
           };
         }
       }
