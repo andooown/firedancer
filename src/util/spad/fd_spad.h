@@ -531,6 +531,28 @@ fd_spad_private_frame_end_debug( fd_spad_t ** _spad ) {
 
 #define FD_SPAD_FRAME_END_DEBUG while(0); } while(0)
 
+#ifdef FD_SPAD_USE_HANDHOLDING
+
+#define fd_spad_alloc_max fd_spad_alloc_max_debug
+#define fd_spad_frame_lo  fd_spad_frame_lo_debug
+#define fd_spad_frame_hi  fd_spad_frame_hi_debug
+#define fd_spad_push      fd_spad_push_debug
+#define fd_spad_pop       fd_spad_pop_debug
+#define fd_spad_alloc     fd_spad_alloc_debug
+#define fd_spad_trim      fd_spad_trim_debug
+#define fd_spad_prepare   fd_spad_prepare_debug
+#define fd_spad_cancel    fd_spad_cancel_debug
+#define fd_spad_publish   fd_spad_publish_debug
+
+#undef  FD_SPAD_FRAME_BEGIN
+#undef  FD_SPAD_FRAME_END
+
+#define FD_SPAD_FRAME_BEGIN FD_SPAD_FRAME_BEGIN_DEBUG
+#define FD_SPAD_FRAME_END   FD_SPAD_FRAME_END_DEBUG
+
+#endif /* FD_SPAD_USE_HANDHOLDING */
+
+
 /* fd_valloc virtual function table for spad */
 extern const fd_valloc_vtable_t fd_spad_vtable;
 

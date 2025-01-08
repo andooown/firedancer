@@ -1,6 +1,46 @@
 #include "fd_spad.h"
 #include "../log/fd_log.h"
 
+/* fd_valloc virtual function table for spad */
+static void *
+fd_spad_valloc_malloc( void * _self,
+                               ulong  align,
+                               ulong  sz ) {
+  fd_spad_t * spad = _self;
+  return fd_spad_alloc( spad, align, sz );
+}
+
+static void
+fd_spad_valloc_free( void * _self,
+                             void * _addr ) {
+  (void)_self; (void)_addr;
+}
+
+const fd_valloc_vtable_t
+fd_spad_vtable = {
+  .malloc = fd_spad_valloc_malloc,
+  .free   = fd_spad_valloc_free
+};
+
+/* With FD_SPAD_USE_HANDHOLDING, fd_spad.h overrides certain spad ops
+   with macros that call the debug variants of the functions.
+   This is useful for debugging, but we need to undefine these
+   macros to avoid infinite recursion in the debug definitions.
+
+   FIXME: better ways to avoid macro conflicts? */
+#ifdef FD_SPAD_USE_HANDHOLDING
+#undef fd_spad_alloc_max
+#undef fd_spad_frame_lo
+#undef fd_spad_frame_hi
+#undef fd_spad_push
+#undef fd_spad_pop
+#undef fd_spad_alloc
+#undef fd_spad_trim
+#undef fd_spad_prepare
+#undef fd_spad_cancel
+#undef fd_spad_publish
+#endif 
+
 int
 fd_spad_verify( fd_spad_t const * spad ) {
 
@@ -110,28 +150,3 @@ fd_spad_publish_debug( fd_spad_t * spad,
      tracking that state */
   fd_spad_publish( spad, sz );
 }
-
-/* fd_valloc virtual function table for spad */
-static void *
-fd_spad_valloc_malloc( void * _self,
-                               ulong  align,
-                               ulong  sz ) {
-  fd_spad_t * spad = _self;
-  void * rv = fd_spad_alloc( spad, align, sz );
-  if( FD_UNLIKELY( fd_spad_mem_used( spad )>fd_spad_mem_max( spad ) ) ) {
-    FD_LOG_ERR(( "spad overflow mem_used=%lu mem_max=%lu", fd_spad_mem_used( spad ), fd_spad_mem_max( spad ) ));
-  }
-  return rv;
-}
-
-static void
-fd_spad_valloc_free( void * _self,
-                             void * _addr ) {
-  (void)_self; (void)_addr;
-}
-
-const fd_valloc_vtable_t
-fd_spad_vtable = {
-  .malloc = fd_spad_valloc_malloc,
-  .free   = fd_spad_valloc_free
-};
