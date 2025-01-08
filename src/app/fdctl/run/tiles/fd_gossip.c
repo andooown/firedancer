@@ -56,6 +56,21 @@
 
 static volatile ulong * fd_shred_version;
 
+static int
+fd_pubkey_eq( fd_pubkey_t const * key1, fd_pubkey_t const * key2 ) {
+  return memcmp( key1->key, key2->key, sizeof(fd_pubkey_t) ) == 0;
+}
+
+static ulong
+fd_pubkey_hash( fd_pubkey_t const * key, ulong seed ) {
+  return fd_hash( seed, key->key, sizeof(fd_pubkey_t) );
+}
+
+static void
+fd_pubkey_copy( fd_pubkey_t * keyd, fd_pubkey_t const * keys ) {
+  memcpy( keyd->key, keys->key, sizeof(fd_pubkey_t) );
+}
+
 /* Contact info table */
 #define MAP_NAME     fd_contact_info_table
 #define MAP_KEY_T    fd_pubkey_t
