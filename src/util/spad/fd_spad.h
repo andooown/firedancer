@@ -350,6 +350,16 @@ fd_spad_push( fd_spad_t * spad ) {
 static inline void
 fd_spad_pop( fd_spad_t * spad ) {
   spad->mem_used = spad->off[ spad->frame_free++ ];
+# if FD_HAS_DEEPASAN
+  ulong aligned_start = fd_ulong_align_up( (ulong)fd_spad_private_mem(spad) + spad->mem_used, FD_ASAN_ALIGN );
+  ulong aligned_end   = fd_ulong_align_dn( (ulong)spad + spad->mem_max, FD_ASAN_ALIGN );
+  fd_asan_poison( (void*)aligned_start, aligned_end - aligned_start );
+# endif
+#if FD_HAS_MSAN
+  ulong aligned_start = fd_ulong_align_up( (ulong)fd_spad_private_mem(spad) + spad->mem_used, FD_ASAN_ALIGN );
+  ulong aligned_end   = fd_ulong_align_dn( (ulong)spad + spad->mem_max, FD_ASAN_ALIGN );
+  fd_msan_poison( (void*)aligned_start, aligned_end - aligned_start );
+#endif
 }
 
 /* The construct:
@@ -404,6 +414,16 @@ fd_spad_alloc( fd_spad_t * spad,
   ulong   off = fd_ulong_align_up( spad->mem_used, align );
   uchar * buf = fd_spad_private_mem( spad ) + off;
   spad->mem_used = off + sz;
+# if FD_HAS_DEEPASAN
+  ulong aligned_start = fd_ulong_align_dn( (ulong)buf, FD_ASAN_ALIGN );
+  ulong aligned_end   = fd_ulong_align_up( (ulong)buf + sz, FD_ASAN_ALIGN );
+  fd_asan_unpoison( (void*)aligned_start, aligned_end - aligned_start );
+# endif
+#if FD_HAS_MSAN
+  ulong aligned_start = fd_ulong_align_dn( (ulong)buf, FD_ASAN_ALIGN );
+  ulong aligned_end   = fd_ulong_align_up( (ulong)buf + sz, FD_ASAN_ALIGN );
+  fd_msan_unpoison( (void*)aligned_start, aligned_end - aligned_start );
+#endif
   return buf;
 }
 
@@ -502,7 +522,21 @@ fd_spad_cancel( fd_spad_t * spad ) {
 static inline void
 fd_spad_publish( fd_spad_t * spad,
                  ulong       sz ) {
+# if (FD_HAS_DEEPASAN || FD_HAS_MSAN)
+  ulong   off = spad->mem_used;
+  uchar * buf = fd_spad_private_mem( spad ) + off;
+#endif
   spad->mem_used += sz;
+# if FD_HAS_DEEPASAN
+  ulong aligned_start = fd_ulong_align_dn( (ulong)buf, FD_ASAN_ALIGN );
+  ulong aligned_end   = fd_ulong_align_up( (ulong)buf + sz, FD_ASAN_ALIGN );
+  fd_asan_unpoison( (void*)aligned_start, aligned_end - aligned_start );
+# endif
+#if FD_HAS_MSAN
+  ulong aligned_start = fd_ulong_align_dn( (ulong)buf, FD_ASAN_ALIGN );
+  ulong aligned_end   = fd_ulong_align_up( (ulong)buf + sz, FD_ASAN_ALIGN );
+  fd_msan_unpoison( (void*)aligned_start, aligned_end - aligned_start );
+#endif
 }
 
 /* fd_spad_verify returns a negative integer error code if the spad is
