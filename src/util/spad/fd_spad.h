@@ -1,6 +1,8 @@
 #ifndef HEADER_fd_src_util_spad_fd_spad_h
 #define HEADER_fd_src_util_spad_fd_spad_h
 
+#include "../sanitize/fd_sanitize.h"
+
 /* APIs for high performance persistent inter-process shared scratch pad
    memories.  A spad as a scratch pad that behaves very much like a
    thread's stack:
@@ -145,6 +147,16 @@ static inline void
 fd_spad_reset( fd_spad_t * spad ) {
   spad->frame_free = FD_SPAD_FRAME_MAX;
   spad->mem_used   = 0UL;
+# if FD_HAS_DEEPASAN
+  ulong aligned_start = fd_ulong_align_up( (ulong)fd_spad_private_mem(spad), FD_ASAN_ALIGN );
+  ulong aligned_end   = fd_ulong_align_dn( (ulong)spad + spad->mem_max, FD_ASAN_ALIGN );
+  fd_asan_poison( (void*)aligned_start, aligned_end - aligned_start );
+# endif
+#if FD_HAS_MSAN
+  ulong aligned_start = fd_ulong_align_up( (ulong)fd_spad_private_mem(spad), FD_ASAN_ALIGN );
+  ulong aligned_end   = fd_ulong_align_dn( (ulong)spad + spad->mem_max, FD_ASAN_ALIGN );
+  fd_msan_poison( (void*)aligned_start, aligned_end - aligned_start );
+#endif
 }
 
 /* fd_spad_mem_max_max returns the largest mem_max possible for a spad
@@ -200,7 +212,7 @@ fd_spad_new( void * shmem,
 
   spad->mem_max = mem_max;
 
-  fd_spad_reset( spad);
+  fd_spad_reset( spad );
 
   FD_COMPILER_MFENCE();
   FD_VOLATILE( spad->magic ) = FD_SPAD_MAGIC;
