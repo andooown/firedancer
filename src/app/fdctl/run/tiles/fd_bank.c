@@ -22,6 +22,7 @@ typedef struct {
 
   void const * _bank;
   ulong _microblock_idx;
+  int _is_bundle;
 
   ulong * busy_fseq;
 
@@ -121,6 +122,7 @@ during_frag( fd_bank_ctx_t * ctx,
   fd_microblock_bank_trailer_t * trailer = (fd_microblock_bank_trailer_t *)( src+sz-sizeof(fd_microblock_bank_trailer_t) );
   ctx->_bank = trailer->bank;
   ctx->_microblock_idx = trailer->microblock_idx;
+  ctx->_is_bundle = trailer->is_bundle;
 }
 
 static void
@@ -129,7 +131,7 @@ hash_transactions( void *       mem,
                    ulong        txn_cnt,
                    uchar *      mixin ) {
   fd_bmtree_commit_t * bmtree = fd_bmtree_commit_init( mem, 32UL, 1UL, 0UL );
-  for( ulong i=0; i<txn_cnt; i++ ) {
+  for( ulong i=0UL; i<txn_cnt; i++ ) {
     fd_txn_p_t * _txn = txns + i;
     if( FD_UNLIKELY( !(_txn->flags & FD_TXN_P_FLAGS_EXECUTE_SUCCESS) ) ) continue;
 
@@ -145,16 +147,11 @@ hash_transactions( void *       mem,
 }
 
 static inline void
-after_frag( fd_bank_ctx_t *     ctx,
-            ulong               in_idx,
-            ulong               seq,
-            ulong               sig,
-            ulong               sz,
-            ulong               tsorig,
-            fd_stem_context_t * stem ) {
-  (void)in_idx;
-  (void)tsorig;
-
+handle_microblock( fd_bank_ctx_t *     ctx,
+                   ulong               seq,
+                   ulong               sig,
+                   ulong               sz,
+                   fd_stem_context_t * stem ) {
   uchar * dst = (uchar *)fd_chunk_to_laddr( ctx->out_mem, ctx->out_chunk );
 
   ulong slot = fd_disco_poh_sig_slot( sig );
@@ -199,10 +196,10 @@ after_frag( fd_bank_ctx_t *     ctx,
                                                                       sanitized_txn_cnt,
                                                                       processing_results,
                                                                       transaction_err,
-                                                                      consumed_cus     );
+                                                                      consumed_cus );
 
   ulong sanitized_idx = 0UL;
-  for( ulong i=0; i<txn_cnt; i++ ) {
+  for( ulong i=0UL; i<txn_cnt; i++ ) {
     fd_txn_p_t * txn = (fd_txn_p_t *)( dst + (i*sizeof(fd_txn_p_t)) );
 
     uint requested_cus       = txn->pack_cu.requested_execution_cus;
@@ -256,19 +253,17 @@ after_frag( fd_bank_ctx_t *     ctx,
   }
 
   /* Commit must succeed so no failure path.  This function takes
-      ownership of the load_and_execute_output and pre_balance_info heap
-      allocations and will free them before it returns.  They should not
-      be reused.  Once commit is called, the transactions MUST be mixed
-      into the PoH otherwise we will fork and diverge, so the link from
-      here til PoH mixin must be completely reliable with nothing dropped. */
+     ownership of the load_and_execute_output and pre_balance_info heap
+     allocations and will free them before it returns.  They should not
+     be reused.  Once commit is called, the transactions MUST be mixed
+     into the PoH otherwise we will fork and diverge, so the link from
+     here til PoH mixin must be completely reliable with nothing dropped. */
   fd_ext_bank_commit_txns( ctx->_bank, ctx->txn_abi_mem, sanitized_txn_cnt, load_and_execute_output, pre_balance_info );
   pre_balance_info        = NULL;
   load_and_execute_output = NULL;
 
   /* Indicate to pack tile we are done processing the transactions so
-     it can pack new microblocks using these accounts.  This has to be
-     done after commiting the transactions to poh otherwise there is a
-     race. */
+     it can pack new microblocks using these accounts. */
   fd_fseq_update( ctx->busy_fseq, seq );
 
   /* Now produce the merkle hash of the transactions for inclusion
@@ -283,9 +278,9 @@ after_frag( fd_bank_ctx_t *     ctx,
   FD_STATIC_ASSERT( MAX_MICROBLOCK_SZ-(MAX_TXN_PER_MICROBLOCK*sizeof(fd_txn_p_t))>=sizeof(fd_microblock_bank_trailer_t), poh_shred_mtu );
 
   /* We have a race window with the GUI, where if the slot is ending it
-    will snap these metrics to draw the waterfall, but see them outdated
-    because housekeeping hasn't run.  For now just update them here, but
-    PoH should eventually flush the pipeline before ending the slot. */
+     will snap these metrics to draw the waterfall, but see them outdated
+     because housekeeping hasn't run.  For now just update them here, but
+     PoH should eventually flush the pipeline before ending the slot. */
   metrics_write( ctx );
 
   ulong bank_sig = fd_disco_bank_sig( slot, ctx->_microblock_idx );
@@ -297,6 +292,39 @@ after_frag( fd_bank_ctx_t *     ctx,
   ulong new_sz = txn_cnt*sizeof(fd_txn_p_t) + sizeof(fd_microblock_trailer_t);
   fd_stem_publish( stem, 0UL, bank_sig, ctx->out_chunk, new_sz, 0UL, 0UL, tspub );
   ctx->out_chunk = fd_dcache_compact_next( ctx->out_chunk, new_sz, ctx->out_chunk0, ctx->out_wmark );
+}
+
+static inline void
+handle_bundle( fd_bank_ctx_t *     ctx,
+               ulong               seq,
+               ulong               sig,
+               ulong               sz,
+               fd_stem_context_t * stem ) {
+  (void)ctx;
+  (void)seq;
+  (void)sig;
+  (void)sz;
+  (void)stem;
+
+  FD_LOG_ERR(( "bundles unsupported" ));
+} 
+
+static inline void
+after_frag( fd_bank_ctx_t *     ctx,
+            ulong               in_idx,
+            ulong               seq,
+            ulong               sig,
+            ulong               sz,
+            ulong               tsorig,
+            fd_stem_context_t * stem ) {
+  (void)in_idx;
+  (void)tsorig;
+
+  if( FD_UNLIKELY( ctx->_is_bundle ) ) {
+    handle_bundle( ctx, seq, sig, sz, stem );
+  } else {
+    handle_microblock( ctx, seq, sig, sz, stem );
+  }
 }
 
 static void
@@ -337,7 +365,10 @@ unprivileged_init( fd_topo_t *      topo,
   ctx->out_chunk  = ctx->out_chunk0;
 }
 
-#define STEM_BURST (1UL)
+/* For a bundle, one bundle might burst into at most 5 separate PoH mixins, since the
+   microblocks cannot be conflicting. */
+
+#define STEM_BURST (5UL)
 
 /* See explanation in fd_pack */
 #define STEM_LAZY  (128L*3000L)

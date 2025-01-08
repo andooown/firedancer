@@ -172,6 +172,12 @@ metric introduced.
     <counter name="PktNoKey" enum="QuicEncLevel" summary="Number of packets that failed decryption due to missing key." />
 </tile>
 
+<tile name="bundle">
+    <counter name="TransactionReceived" summary="Total count of transactions received, including transactions within bundles" />
+    <counter name="PacketReceived" summary="Total count of packets received" />
+    <counter name="BundleReceived" summary="Total count of bundles received" />
+</tile>
+
 <tile name="verify">
     <counter name="TransactionParseFailure" summary="Count of transactions that failed to parse" />
     <counter name="TransactionDedupFailure" summary="Count of transactions that failed to deduplicate in the verify stage" />

@@ -120,6 +120,13 @@
 | quic_&#8203;pkt_&#8203;no_&#8203;key_&#8203;handshake | `counter` | Number of packets that failed decryption due to missing key. (handshake) |
 | quic_&#8203;pkt_&#8203;no_&#8203;key_&#8203;app | `counter` | Number of packets that failed decryption due to missing key. (app data) |
 
+## Bundle Tile
+| Metric | Type | Description |
+|--------|------|-------------|
+| bundle_&#8203;transaction_&#8203;received | `counter` | Total count of transactions received, including transactions within bundles |
+| bundle_&#8203;packet_&#8203;received | `counter` | Total count of packets received |
+| bundle_&#8203;bundle_&#8203;received | `counter` | Total count of bundles received |
+
 ## Verify Tile
 | Metric | Type | Description |
 |--------|------|-------------|

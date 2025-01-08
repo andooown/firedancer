@@ -152,15 +152,19 @@ after_frag( fd_dedup_ctx_t *    ctx,
     if( FD_UNLIKELY( ctx->in_kind[ in_idx ]==IN_KIND_GOSSIP ) ) FD_MCNT_INC( DEDUP, GOSSIPED_VOTES_RECEIVED, 1UL );
   }
 
-  /* Compute fd_hash(signature) for dedup. */
-  ulong ha_dedup_tag = fd_hash( ctx->hashmap_seed, fd_txn_m_payload( txnm )+txn->signature_off, 64UL );
+  int is_dup = 0;
+  if( FD_LIKELY( !txnm->block_engine.bundle_id ) ) {
+    /* Compute fd_hash(signature) for dedup. */
+    ulong ha_dedup_tag = fd_hash( ctx->hashmap_seed, fd_txn_m_payload( txnm )+txn->signature_off, 64UL );
 
-  int is_dup;
-  FD_TCACHE_INSERT( is_dup, *ctx->tcache_sync, ctx->tcache_ring, ctx->tcache_depth, ctx->tcache_map, ctx->tcache_map_cnt, ha_dedup_tag );
+    int is_dup;
+    FD_TCACHE_INSERT( is_dup, *ctx->tcache_sync, ctx->tcache_ring, ctx->tcache_depth, ctx->tcache_map, ctx->tcache_map_cnt, ha_dedup_tag );
+  }
+
   if( FD_LIKELY( is_dup ) ) {
     ctx->metrics.dedup_fail_cnt++;
   } else {
-    ulong realized_sz = fd_txn_m_realized_footprint( txnm, 0 );
+    ulong realized_sz = fd_txn_m_realized_footprint( txnm, 1, 0 );
     ulong tspub = (ulong)fd_frag_meta_ts_comp( fd_tickcount() );
     fd_stem_publish( stem, 0UL, 0, ctx->out_chunk, realized_sz, 0UL, tsorig, tspub );
     ctx->out_chunk = fd_dcache_compact_next( ctx->out_chunk, realized_sz, ctx->out_chunk0, ctx->out_wmark );

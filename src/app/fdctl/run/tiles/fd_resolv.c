@@ -234,7 +234,7 @@ after_frag( fd_resolv_ctx_t *   ctx,
     if( FD_UNLIKELY( result!=FD_BANK_ABI_TXN_INIT_SUCCESS ) ) return;
   }
 
-  ulong realized_sz = fd_txn_m_realized_footprint( txnm, 1 );
+  ulong realized_sz = fd_txn_m_realized_footprint( txnm, 1, 1 );
   ulong tspub = fd_frag_meta_ts_comp( fd_tickcount() );
   fd_stem_publish( stem, 0UL, txnm->reference_slot, ctx->out_chunk, realized_sz, 0UL, tsorig, tspub );
   ctx->out_chunk = fd_dcache_compact_next( ctx->out_chunk, realized_sz, ctx->out_chunk0, ctx->out_wmark );

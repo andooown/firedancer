@@ -100,6 +100,8 @@ fd_gui_new( void *             shmem,
   gui->summary.tile_timers_history_idx = 0UL;
   for( ulong i=0UL; i<FD_GUI_TILE_TIMER_LEADER_CNT; i++ ) gui->summary.tile_timers_leader_history_slot[ i ] = ULONG_MAX;
 
+  gui->block_engine.has_block_engine = 0;
+
   gui->epoch.has_epoch[ 0 ] = 0;
   gui->epoch.has_epoch[ 1 ] = 0;
 
@@ -143,6 +145,11 @@ fd_gui_ws_open( fd_gui_t * gui,
   ulong printers_len = sizeof(printers) / sizeof(printers[0]);
   for( ulong i=0UL; i<printers_len; i++ ) {
     printers[ i ]( gui );
+    FD_TEST( !fd_http_server_ws_send( gui->http, ws_conn_id ) );
+  }
+
+  if( FD_LIKELY( gui->block_engine.has_block_engine ) ) {
+    fd_gui_printf_block_engine( gui );
     FD_TEST( !fd_http_server_ws_send( gui->http, ws_conn_id ) );
   }
 
@@ -360,6 +367,15 @@ fd_gui_txn_waterfall_snap( fd_gui_t *               gui,
     cur->out.net_overrun += net_metrics[ MIDX( COUNTER, NET, XDP_RX_DROPPED_OTHER ) ];
   }
 
+  ulong bundle_txns_received = 0UL;
+  ulong bundle_tile_idx = fd_topo_find_tile( topo, "bundle", 0UL );
+  if( FD_LIKELY( bundle_tile_idx!=ULONG_MAX ) ) {
+    fd_topo_tile_t const * bundle = &topo->tiles[ bundle_tile_idx ];
+    volatile ulong const * bundle_metrics = fd_metrics_tile( bundle->metrics );
+
+    bundle_txns_received = bundle_metrics[ MIDX( COUNTER, BUNDLE, TRANSACTION_RECEIVED ) ];
+  }
+
   cur->in.gossip   = dedup_metrics[ MIDX( COUNTER, DEDUP, GOSSIPED_VOTES_RECEIVED ) ];
   cur->in.quic     = cur->out.tpu_quic_invalid +
                      cur->out.quic_overrun +
@@ -367,6 +383,7 @@ fd_gui_txn_waterfall_snap( fd_gui_t *               gui,
                      cur->out.quic_abandoned +
                      cur->out.net_overrun;
   cur->in.udp      = cur->out.tpu_udp_invalid;
+  cur->in.block_engine = bundle_txns_received;
   for( ulong i=0UL; i<gui->summary.quic_tile_cnt; i++ ) {
     fd_topo_tile_t const * quic = &topo->tiles[ fd_topo_find_tile( topo, "quic", i ) ];
     volatile ulong * quic_metrics = fd_metrics_tile( quic->metrics );
@@ -1428,6 +1445,20 @@ fd_gui_handle_start_progress( fd_gui_t *    gui,
   fd_http_server_ws_broadcast( gui->http );
 }
 
+static void
+fd_gui_handle_block_engine_update( fd_gui_t *    gui,
+                                   uchar const * msg ) {
+  fd_plugin_msg_block_engine_update_t const * update = (fd_plugin_msg_block_engine_update_t const *)msg;
+
+  gui->block_engine.has_block_engine = 1;
+  strncpy( gui->block_engine.name, update->name, sizeof(gui->block_engine.name) );
+  strncpy( gui->block_engine.url, update->url, sizeof(gui->block_engine.url) );
+  gui->block_engine.status = update->status;
+
+  fd_gui_printf_block_engine( gui );
+  fd_http_server_ws_broadcast( gui->http );
+}
+
 void
 fd_gui_plugin_message( fd_gui_t *    gui,
                        ulong         plugin_msg,
@@ -1482,6 +1513,10 @@ fd_gui_plugin_message( fd_gui_t *    gui,
     }
     case FD_PLUGIN_MSG_START_PROGRESS: {
       fd_gui_handle_start_progress( gui, msg );
+      break;
+    }
+    case FD_PLUGIN_MSG_BLOCK_ENGINE_UPDATE: {
+      fd_gui_handle_block_engine_update( gui, msg );
       break;
     }
     default:
