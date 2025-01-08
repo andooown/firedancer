@@ -94,7 +94,7 @@ struct fd_ledger_args {
   ulong                 incremental_freq;        /* How often an incremental snapshot should be produced */
   char const *          snapshot_dir;            /* Directory to create a snapshot in */
   ulong                 snapshot_tcnt;           /* Number of threads to use for snapshot creation */
-  double                allowed_mem_delta;       /* Percent of memory in the blockstore wksp that can be 
+  double                allowed_mem_delta;       /* Percent of memory in the blockstore wksp that can be
                                                     used and not freed between the start of end of execution.
                                                     If the difference in usage exceeds this value, error out. */
 
@@ -1727,7 +1727,7 @@ initial_setup( int argc, char ** argv, fd_ledger_args_t * args ) {
 
 int main( int argc, char ** argv ) {
   /* Declaring this on the stack gets the alignment wrong when using asan */
-  fd_ledger_args_t * args = aligned_alloc( alignof(fd_ledger_args_t), sizeof(fd_ledger_args_t) );
+  fd_ledger_args_t * args = fd_alloca( alignof(fd_ledger_args_t), sizeof(fd_ledger_args_t) );
   memset( args, 0, sizeof(fd_ledger_args_t) );
   initial_setup( argc, argv, args );
 
@@ -1745,6 +1745,5 @@ int main( int argc, char ** argv ) {
     FD_LOG_ERR(( "unknown command=%s", args->cmd ));
   }
 
-  free( args );
   return 0;
 }

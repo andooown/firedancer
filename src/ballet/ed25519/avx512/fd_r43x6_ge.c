@@ -1,4 +1,5 @@
 #include "fd_r43x6_ge.h"
+#include "../../../util/scratch/fd_scratch.h"
 
 /* Direct quotes from RFC 8032 are indicated with '//' style comments. */
 
@@ -186,7 +187,11 @@ fd_r43x6_ge_decode2( wwl_t * _Pa03, wwl_t * _Pa14, wwl_t * _Pa25,
   fd_r43x6_t const d       = fd_r43x6_d();
   fd_r43x6_t const sqrt_m1 = fd_r43x6_imag();
 
+#if FD_HAS_ASAN
+  ulong * _sa = fd_alloca( 32, 4*sizeof(ulong) );                  ulong * _sb = fd_alloca( 32, 4*sizeof(ulong) );
+#else
   ulong _sa[4] __attribute__((aligned(32)));                       ulong _sb[4] __attribute__((aligned(32)));
+#endif
   memcpy( _sa, _vsa, 32UL );                                       memcpy( _sb, _vsb, 32UL );
   ulong y0a = _sa[0];                                              ulong y0b = _sb[0];
   ulong y1a = _sa[1];                                              ulong y1b = _sb[1];

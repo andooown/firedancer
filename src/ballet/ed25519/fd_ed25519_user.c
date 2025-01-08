@@ -251,9 +251,9 @@ int fd_ed25519_verify_batch_single_msg( uchar const   msg[], /* msg_sz */
   return FD_ED25519_SUCCESS;
 #else
 
-  fd_ed25519_point_t R     [MAX];
-  fd_ed25519_point_t Aprime[MAX];
-  uchar              k     [MAX * 32];
+  fd_ed25519_point_t * R      = fd_alloca( alignof(fd_ed25519_point_t), sizeof(fd_ed25519_point_t)*MAX );
+  fd_ed25519_point_t * Aprime = fd_alloca( alignof(fd_ed25519_point_t), sizeof(fd_ed25519_point_t)*MAX );
+  uchar              k          [MAX * 32];
 
   /* The first batch_sz points are the R_j, the last are A'_j.
      Scalars will be stored accordingly. */
