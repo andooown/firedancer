@@ -1,6 +1,3 @@
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-
 /* Padding Frame
 
    PADDING Frame {
@@ -363,4 +360,3 @@ FD_TEMPL_DEF_STRUCT_BEGIN(handshake_done_frame)
   FD_TEMPL_MBR_FRAME_TYPE( type, 0x1e,0x1e )
 FD_TEMPL_DEF_STRUCT_END(handshake_done_frame)
 
-#pragma GCC diagnostic pop
