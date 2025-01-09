@@ -118,7 +118,11 @@ struct fd_ledger_args {
   int                   is_snapshotting;         /* determine if a snapshot is being created */
   int                   snapshot_mismatch;       /* determine if a snapshot should be created on a mismatch */
 
-  char const *      lthash;
+  uchar *               bg_snapshot_scr_mem;
+  uchar *               snapshot_scr_mem;
+  uchar *               tpool_scr_mem;
+
+  char const *          lthash;
 };
 typedef struct fd_ledger_args fd_ledger_args_t;
 
@@ -209,6 +213,7 @@ init_tpool( fd_ledger_args_t * ledger_args ) {
     }
     ulong scratch_sz = fd_scratch_smem_footprint( 256UL<<20UL );
     tpool_scr_mem = fd_valloc_malloc( ledger_args->slot_ctx->valloc, FD_SCRATCH_SMEM_ALIGN, scratch_sz*(tcnt) );
+    ledger_args->tpool_scr_mem = tpool_scr_mem;
     if( tpool_scr_mem == NULL ) {
       FD_LOG_ERR( ( "failed to allocate thread pool scratch space" ) );
     }
@@ -238,6 +243,7 @@ init_tpool( fd_ledger_args_t * ledger_args ) {
   fd_tpool_t * snapshot_bg_tpool = fd_tpool_init( ledger_args->tpool_mem_snapshot_bg, snapshot_tcnt );
   ulong        scratch_sz        = fd_scratch_smem_footprint( 256UL<<20UL );
   tpool_scr_mem                  = fd_valloc_malloc( ledger_args->slot_ctx->valloc, FD_SCRATCH_SMEM_ALIGN, scratch_sz );
+  ledger_args->bg_snapshot_scr_mem = tpool_scr_mem;
   if( FD_UNLIKELY( !fd_tpool_worker_push( snapshot_bg_tpool, start_idx++, tpool_scr_mem, scratch_sz ) ) ) {
       FD_LOG_ERR(( "failed to launch worker" ));
   } else {
@@ -256,6 +262,7 @@ init_tpool( fd_ledger_args_t * ledger_args ) {
   fd_tpool_t * snapshot_tpool = fd_tpool_init( ledger_args->tpool_mem_snapshot, snapshot_tcnt - 1UL );
   scratch_sz                  = fd_scratch_smem_footprint( 256UL<<20UL );
   tpool_scr_mem               = fd_valloc_malloc( ledger_args->slot_ctx->valloc, FD_SCRATCH_SMEM_ALIGN, scratch_sz );
+  ledger_args->snapshot_scr_mem = tpool_scr_mem;
   for( ulong i=1UL; i<snapshot_tcnt - 1UL; ++i ) {
     if( FD_UNLIKELY( !fd_tpool_worker_push( snapshot_tpool, start_idx++, tpool_scr_mem  + scratch_sz*(i-1UL), scratch_sz ) ) ) {
       FD_LOG_ERR(( "failed to launch worker" ));
@@ -718,10 +725,19 @@ fd_ledger_main_teardown( fd_ledger_args_t * args ) {
     fd_solcap_writer_flush( args->capture_ctx->capture );
     fd_solcap_writer_delete( args->capture_ctx->capture );
   }
+  if ( NULL != args->bg_snapshot_scr_mem)
+    fd_valloc_free( args->slot_ctx->valloc, args->bg_snapshot_scr_mem );
+  if ( NULL != args->snapshot_scr_mem)
+    fd_valloc_free( args->slot_ctx->valloc, args->snapshot_scr_mem );
+  if ( NULL != args->tpool_scr_mem)
+    fd_valloc_free( args->slot_ctx->valloc, args->tpool_scr_mem );
+
   fd_exec_epoch_ctx_delete( args->epoch_ctx );
   fd_exec_slot_ctx_delete( args->slot_ctx );
-  fd_exec_epoch_ctx_leave( args->epoch_ctx );
-  fd_exec_slot_ctx_leave( args->slot_ctx );
+
+
+//  fd_exec_epoch_ctx_leave( args->epoch_ctx );
+//  fd_exec_slot_ctx_leave( args->slot_ctx );
 }
 
 void
