@@ -211,6 +211,7 @@ fdctl_pod_to_cfg( config_t * config,
   CFG_POP      ( cstr,   user                                             );
   CFG_POP      ( cstr,   scratch_directory                                );
   CFG_POP      ( cstr,   dynamic_port_range                               );
+  CFG_POP      ( cstr,   geyser_plugin_config                             );
 
   CFG_POP      ( cstr,   log.path                                         );
   CFG_POP      ( cstr,   log.colorize                                     );

@@ -37,6 +37,8 @@ typedef struct {
 
   char dynamic_port_range[ 32 ];
 
+  char geyser_plugin_config[ PATH_MAX ];
+
   struct {
     char path[ PATH_MAX ];
     char colorize[ 6 ];
