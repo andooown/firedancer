@@ -94,7 +94,7 @@ struct fd_ledger_args {
   ulong                 incremental_freq;        /* How often an incremental snapshot should be produced */
   char const *          snapshot_dir;            /* Directory to create a snapshot in */
   ulong                 snapshot_tcnt;           /* Number of threads to use for snapshot creation */
-  double                allowed_mem_delta;       /* Percent of memory in the blockstore wksp that can be 
+  double                allowed_mem_delta;       /* Percent of memory in the blockstore wksp that can be
                                                     used and not freed between the start of end of execution.
                                                     If the difference in usage exceeds this value, error out. */
 
@@ -271,6 +271,8 @@ init_tpool( fd_ledger_args_t * ledger_args ) {
 
 int
 runtime_replay( fd_ledger_args_t * ledger_args ) {
+  int ret = 0;
+
   fd_features_restore( ledger_args->slot_ctx );
 
   fd_runtime_update_leaders( ledger_args->slot_ctx, ledger_args->slot_ctx->slot_bank.slot );
@@ -476,7 +478,8 @@ runtime_replay( fd_ledger_args_t * ledger_args ) {
       }
       if( ledger_args->abort_on_mismatch ) {
         fd_blockstore_end_read( blockstore );
-        return 1;
+        ret = 1;
+        break;
       }
     }
 
@@ -514,7 +517,8 @@ runtime_replay( fd_ledger_args_t * ledger_args ) {
       }
       if( ledger_args->abort_on_mismatch ) {
         fd_blockstore_end_read( blockstore );
-        return 1;
+        ret = 1;
+        break;
       }
     }
     fd_blockstore_end_read( blockstore );
@@ -595,7 +599,7 @@ runtime_replay( fd_ledger_args_t * ledger_args ) {
     FD_LOG_ERR(( "No slots replayed" ));
   }
 
-  return 0;
+  return ret;
 }
 
 /***************************** Helpers ****************************************/
@@ -714,8 +718,10 @@ fd_ledger_main_teardown( fd_ledger_args_t * args ) {
     fd_solcap_writer_flush( args->capture_ctx->capture );
     fd_solcap_writer_delete( args->capture_ctx->capture );
   }
-  fd_exec_epoch_ctx_delete( fd_exec_epoch_ctx_leave( args->epoch_ctx ) );
-  fd_exec_slot_ctx_delete( fd_exec_slot_ctx_leave( args->slot_ctx ) );
+  fd_exec_epoch_ctx_delete( args->epoch_ctx );
+  fd_exec_slot_ctx_delete( args->slot_ctx );
+  fd_exec_epoch_ctx_leave( args->epoch_ctx );
+  fd_exec_slot_ctx_leave( args->slot_ctx );
 }
 
 void
@@ -1198,7 +1204,10 @@ replay( fd_ledger_args_t * args ) {
   fd_funk_t * funk = args->funk;
 
   /* Setup slot_ctx */
-  fd_valloc_t valloc = allocator_setup( args->wksp, args->allocator );
+  // fd_valloc_t valloc = allocator_setup( args->wksp, args->allocator );
+
+  fd_valloc_t valloc2 = allocator_setup( args->wksp, args->allocator );
+  fd_valloc_t valloc = fd_backtracing_alloc_virtual ( &valloc2 );
 
   void * epoch_ctx_mem = fd_wksp_alloc_laddr( args->wksp, fd_exec_epoch_ctx_align(),
                                               fd_exec_epoch_ctx_footprint( args->vote_acct_max ), FD_EXEC_EPOCH_CTX_MAGIC );
